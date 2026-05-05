@@ -4,6 +4,8 @@ from pathlib import Path
 import jwt
 import datetime
 import exceptions
+import base64
+from cryptography.fernet import Fernet
 
 class SeverManager():
     SERVER_DB_PATH = "server.db"
@@ -19,10 +21,11 @@ class SeverManager():
             cursor = conn.cursor()
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                username TEXT NOT NULL PRIMARY KEY UNIQUE,
-                password_hash TEXT NOT NULL
-            );
-        """)
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                public_key TEXT NOT NULL
+                encrypted_private_key TEXT NOT NULL
+            );""")
             conn.commit()
         
     def create_pending_messages_table(self):
@@ -48,14 +51,14 @@ class SeverManager():
         cursor.close()
         return exists
     
-    def register_user(self, username: str, password: str):
+    def register_user(self, username: str, password: str, public_key: str, encrypted_private_key: str):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
             cursor = conn.cursor()
             if not self.user_exists(username):
                 hashed_pass = hashlib.sha256()
                 hashed_pass.update(password.encode())
                 hashed_pass = hashed_pass.hexdigest()
-                cursor.execute("INSERT INTO users VALUES (?, ?)", (username, hashed_pass))
+                cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?)", (username, hashed_pass, public_key, encrypted_private_key))
                 conn.commit()
             else:
                 raise exceptions.UserAlreadyExists("Username already exists!")
@@ -97,6 +100,17 @@ class SeverManager():
             else:
                 raise exceptions.InvalidCredentials("Incorrect password or username!")
     
+    def get_public_key_user(self, username: str):
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            if self.user_exists(username):
+                cursor.execute("SELECT public_key FROM users WHERE username=?", (username,))
+                public_key = cursor.fetchone()[0]
+                return public_key
+            else:
+                raise exceptions.UserDoesntExist("The user you are trying to get his public key!")
+
+
     # Msg related functions
     def pend_message(self, token: str, receiver: str, message: str):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
@@ -127,21 +141,10 @@ class SeverManager():
             return messages
 
 if __name__ == '__main__':
+    # Testing the server!
     server = SeverManager()
     
-    try:
-        server.register_user("Sm", "01")
-    except exceptions.UserError as e:
-        print(e)
-        
-    try:
-        print(server.login_user("Sm", "02"))
-    except exceptions.UserError as e:
-        print(e)
-        
-    try:
-        print(server.login_user("Sm", "01"))
-    except exceptions.UserError as e:
-        print(e)
+    print("--- Starting Server Manager Test ---\n")
+
     
     
