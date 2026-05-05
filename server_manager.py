@@ -109,6 +109,14 @@ class SeverManager():
                 return public_key
             else:
                 raise exceptions.UserDoesntExist("The user you are trying to get his public key!")
+    
+    def get_private_key_user(self, token: str):
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            username = self.get_jwt_user(token)
+            cursor.execute("SELECT encrypted_private_key FROM users WHERE username=?", (username,))
+            private_key = cursor.fetchone()[0]
+            return private_key
 
 
     # Msg related functions
