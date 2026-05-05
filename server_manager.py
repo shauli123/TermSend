@@ -33,13 +33,14 @@ class SeverManager():
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
             content TEXT NOT NULL,
+            date TEXT DEFAULT (datetime('now', 'localtime')), 
             FOREIGN KEY (sender) REFERENCES users(username),
             FOREIGN KEY (receiver) REFERENCES users(username)
             );""")
             conn.commit()
 
     
-    # Checks if user exists
+    # User related functions
     def user_exists(self, username: str) -> bool:
         cursor =  sqlite3.connect(self.SERVER_DB_PATH).cursor()
         cursor.execute("""SELECT * FROM users WHERE username=?""", (username,))
@@ -67,10 +68,13 @@ class SeverManager():
         }
         return jwt.encode(payload, self.JWT_SECRET_KEY, algorithm="HS256")
 
-    def validate_jwt(self, token: str):
+    def get_jwt_user(self, token: str):
         try:
             decoded_payload = jwt.decode(token, self.JWT_SECRET_KEY, algorithms=["HS256"])
-            return decoded_payload["user"]
+            if self.user_exists(decoded_payload["user"]):
+                return decoded_payload["user"]
+            else:
+                raise exceptions.TokenError("Invalid token!")
         except jwt.ExpiredSignatureError:
             raise exceptions.TokenError("Login had expired! Re-log to continue!")
         except jwt.InvalidTokenError:
@@ -93,6 +97,35 @@ class SeverManager():
             else:
                 raise exceptions.InvalidCredentials("Incorrect password or username!")
     
+    # Msg related functions
+    def pend_message(self, token: str, receiver: str, message: str):
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            sender = self.get_jwt_user(token)
+            if self.user_exists(receiver):
+                cursor.execute("""
+                INSERT INTO pending_messages (sender, receiver, content)
+                VALUES (?, ?, ?)
+                """, (sender, receiver, message))
+                conn.commit()
+            else:
+                raise exceptions.UserDoesntExist("The user you are trying to send to doesn't exist!")
+
+    def get_pending_messages(self, token: str):
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            username = self.get_jwt_user(token)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT * FROM pending_messages WHERE receiver = ?", (username,))
+            messages = [dict(row) for row in cursor.fetchall()]
+            
+            if messages:
+                cursor.execute("DELETE FROM pending_messages WHERE receiver = ?", (username,))
+                conn.commit()
+        
+            return messages
+
 if __name__ == '__main__':
     server = SeverManager()
     
