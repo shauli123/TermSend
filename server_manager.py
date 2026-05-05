@@ -11,16 +11,33 @@ class SeverManager():
 
     def __init__(self):
         self.create_users_table()
+        self.create_pending_messages_table()
     
-    # DB Init Function
+    # DB Init Functions
     def create_users_table(self):
-        cursor =  sqlite3.connect(self.SERVER_DB_PATH).cursor()
-        cursor.execute("""
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 username TEXT NOT NULL PRIMARY KEY UNIQUE,
                 password_hash TEXT NOT NULL
             );
         """)
+            conn.commit()
+        
+    def create_pending_messages_table(self):
+        with sqlite3.connect(self.SERVER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_messages (
+            sender TEXT NOT NULL,
+            receiver TEXT NOT NULL,
+            content TEXT NOT NULL,
+            FOREIGN KEY (sender) REFERENCES users(username),
+            FOREIGN KEY (receiver) REFERENCES users(username)
+            );""")
+            conn.commit()
+
     
     # Checks if user exists
     def user_exists(self, username: str) -> bool:
