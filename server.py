@@ -11,6 +11,8 @@ import core.protocol as proto
 from core import network
 import server_manager
 import threading
+import exceptions
+import json
 
 pub_pem, priv_pem = crypt.generate_server_keys()
 
@@ -27,14 +29,29 @@ def handle_client(sock: socket.socket, server: server_manager.SeverManager, addr
     msg = proto.Message(network.recv_msg(sock), cipher, proto.Side.CLIENT)
     
     # Response with response
-    res = handle_request(msg).encode()
+    res = handle_request(msg, server).encode()
     network.send_msg(sock, cipher.encrypt(res))
     
     sock.close()
    
-def handle_request(request: proto.Message) -> str:
-    return "NULL"
+def handle_request(request: proto.Message, server: server_manager.SeverManager) -> str:
+    status_code, res_json = 0, {}
+    # Register
+    if request.command == proto.ServerCommands.REGISTER:
+        try: 
+            server.register_user(request.json["username"], request.json["password"], request.json["public_key"], request.json["encrypted_private_key"])
+            status_code, res_json = proto.ServerStatus.OK, {}
+        except exceptions.UserAlreadyExists as e:
+            status_code, res_json = proto.ServerStatus.REGISTER_ERROR, {"error": str(e)}
+    # Login
+    if request.command == proto.ServerCommands.LOGIN:
+        try: 
+            jwt = server.login_user(request.json["username"], request.json["password"])
+            status_code, res_json = proto.ServerStatus.OK, {"jwt": jwt}
+        except exceptions.InvalidCredentials as e:
+            status_code, res_json = proto.ServerStatus.LOGIN_ERROR, {"error": str(e)}
 
+    return f"{int(status_code)}|NONE|{json.dumps(res_json)}"
 
 def main():
     server = server_manager.SeverManager()

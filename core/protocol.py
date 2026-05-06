@@ -10,6 +10,7 @@ class Side(Enum):
 class ServerCommands(StrEnum):
     REGISTER = "REGISTER"
     LOGIN = "LOGIN"
+    GET_PRIVATE_KEY = "GET_PRIVATE_KEY"
     SEND_MSG = "SEND_MSG"
     RECIEVE_MSGS = "RECIEVE_MSGS"
 
