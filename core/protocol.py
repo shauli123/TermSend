@@ -12,7 +12,7 @@ class ServerCommands(StrEnum):
     LOGIN = "LOGIN"
     GET_PUBLIC_KEY = "GET_PUBLIC_KEY"
     SEND_MSG = "SEND_MSG"
-    RECIEVE_MSGS = "RECIEVE_MSGS"
+    RECEIVE_MSGS = "RECEIVE_MSGS"
     
 class ServerStatus(IntEnum):
     # Status OK

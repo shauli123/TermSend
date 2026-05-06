@@ -72,7 +72,7 @@ def handle_request(request: proto.Message, server: server_manager.SeverManager) 
             except exceptions.TokenError as e:
                 status_code, res_json = proto.ServerStatus.TOKEN_ERROR, {"error": str(e)}
         # Recv msgs
-        elif request.command == proto.ServerCommands.SEND_MSG:
+        elif request.command == proto.ServerCommands.RECEIVE_MSGS:
             try: 
                 msgs = server.get_pending_messages(request.jwt)
                 status_code, res_json = proto.ServerStatus.OK, {'messages':msgs}
