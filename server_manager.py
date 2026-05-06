@@ -108,7 +108,7 @@ class SeverManager():
                 public_key = cursor.fetchone()[0]
                 return public_key
             else:
-                raise exceptions.UserDoesntExist("The user you are trying to get his public key!")
+                raise exceptions.UserDoesntExist("The user you trying to send to doesnt exist!")
     
     def get_private_key_user(self, token: str):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:

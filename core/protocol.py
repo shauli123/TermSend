@@ -10,14 +10,14 @@ class Side(Enum):
 class ServerCommands(StrEnum):
     REGISTER = "REGISTER"
     LOGIN = "LOGIN"
-    GET_PRIVATE_KEY = "GET_PRIVATE_KEY"
+    GET_PUBLIC_KEY = "GET_PUBLIC_KEY"
     SEND_MSG = "SEND_MSG"
     RECIEVE_MSGS = "RECIEVE_MSGS"
-
+    
 class ServerStatus(IntEnum):
     # Status OK
     OK = 200
-    SENDED = 201
+    SENT = 201
     # User errors
     TOKEN_ERROR = 401
     REGISTER_ERROR = 400

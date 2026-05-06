@@ -36,20 +36,52 @@ def handle_client(sock: socket.socket, server: server_manager.SeverManager, addr
    
 def handle_request(request: proto.Message, server: server_manager.SeverManager) -> str:
     status_code, res_json = 0, {}
-    # Register
-    if request.command == proto.ServerCommands.REGISTER:
-        try: 
-            server.register_user(request.json["username"], request.json["password"], request.json["public_key"], request.json["encrypted_private_key"])
-            status_code, res_json = proto.ServerStatus.OK, {}
-        except exceptions.UserAlreadyExists as e:
-            status_code, res_json = proto.ServerStatus.REGISTER_ERROR, {"error": str(e)}
-    # Login
-    if request.command == proto.ServerCommands.LOGIN:
-        try: 
-            jwt = server.login_user(request.json["username"], request.json["password"])
-            status_code, res_json = proto.ServerStatus.OK, {"jwt": jwt}
-        except exceptions.InvalidCredentials as e:
-            status_code, res_json = proto.ServerStatus.LOGIN_ERROR, {"error": str(e)}
+    
+    try:
+        # Register
+        if request.command == proto.ServerCommands.REGISTER:
+            try: 
+                server.register_user(request.json["username"], request.json["password"], request.json["public_key"], request.json["encrypted_private_key"])
+                status_code, res_json = proto.ServerStatus.OK, {}
+            except exceptions.UserAlreadyExists as e:
+                status_code, res_json = proto.ServerStatus.REGISTER_ERROR, {"error": str(e)}
+        # Login
+        elif request.command == proto.ServerCommands.LOGIN:
+            try: 
+                jwt = server.login_user(request.json["username"], request.json["password"])
+                enc_private_key = server.get_private_key_user(jwt)
+                status_code, res_json = proto.ServerStatus.OK, {"jwt": jwt, "enc_private_key": enc_private_key}
+            except exceptions.InvalidCredentials as e:
+                status_code, res_json = proto.ServerStatus.LOGIN_ERROR, {"error": str(e)}
+            except exceptions.TokenError:
+                status_code = proto.ServerStatus.SERVER_ERROR
+        # Get Public Key
+        elif request.command == proto.ServerCommands.GET_PUBLIC_KEY:
+            try: 
+                public_key = server.get_public_key_user(request.json["username"])
+                status_code, res_json = proto.ServerStatus.OK, {"public_key": public_key}
+            except exceptions.UserDoesntExist as e:
+                status_code, res_json = proto.ServerStatus.INVALID_USER, {"error": str(e)}
+        # Send msg
+        elif request.command == proto.ServerCommands.SEND_MSG:
+            try: 
+                server.pend_message(request.jwt, request.json["receiver"], request.json["message"])
+                status_code, res_json = proto.ServerStatus.SENT, {}
+            except exceptions.UserDoesntExist as e:
+                status_code, res_json = proto.ServerStatus.INVALID_USER, {"error": str(e)}
+            except exceptions.TokenError as e:
+                status_code, res_json = proto.ServerStatus.TOKEN_ERROR, {"error": str(e)}
+        # Recv msgs
+        elif request.command == proto.ServerCommands.SEND_MSG:
+            try: 
+                msgs = server.get_pending_messages(request.jwt)
+                status_code, res_json = proto.ServerStatus.OK, {'messages':msgs}
+            except exceptions.TokenError as e:
+                status_code, res_json = proto.ServerStatus.TOKEN_ERROR, {"error": str(e)}
+        else:
+            status_code = proto.ServerStatus.UNSUPPORTED_COMMAND
+    except:
+        status_code = proto.ServerStatus.SERVER_ERROR
 
     return f"{int(status_code)}|NONE|{json.dumps(res_json)}"
 
