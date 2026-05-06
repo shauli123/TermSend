@@ -27,9 +27,8 @@ class ServerStatus(IntEnum):
     SERVER_ERROR = 505
 
 class Message():
-    def __init__(self, encrypted_msg: bytes, key: str, sender: Side):
-        f = Fernet(key.encode())
-        self.msg = f.decrypt(encrypted_msg).decode()
+    def __init__(self, encrypted_msg: bytes, key: Fernet, sender: Side):
+        self.msg = key.decrypt(encrypted_msg).decode()
 
         msg_parts = self.msg.split('|', 3)
 
