@@ -1,5 +1,6 @@
 import encryption as crypt
 import socket
+import json
 import core.protocol as proto
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -31,3 +32,15 @@ def send_request(msg: str):
         return proto.Message(network.recv_msg(sock), cipher, proto.Side.SERVER) 
         
         
+def register(username: str, password: str):
+    # genrate keys
+    public_pem, private_pem = crypt.generate_server_keys()
+    user_key = Fernet(f"{username};{password}".encode())
+    enc_private_pem = user_key.encrypt(private_pem)
+
+    req_json = {
+
+
+    }
+    
+    send_request(f"{proto.ServerCommands.REGISTER}||{json.dumps(req_json)}")
