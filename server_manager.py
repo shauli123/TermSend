@@ -6,6 +6,7 @@ import datetime
 import exceptions
 import base64
 from cryptography.fernet import Fernet
+import base64
 
 class SeverManager():
     SERVER_DB_PATH = "server.db"
@@ -35,7 +36,7 @@ class SeverManager():
             CREATE TABLE IF NOT EXISTS pending_messages (
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
-            content TEXT NOT NULL,
+            content BLOB NOT NULL,
             date TEXT DEFAULT (datetime('now', 'localtime')), 
             FOREIGN KEY (sender) REFERENCES users(username),
             FOREIGN KEY (receiver) REFERENCES users(username)
@@ -120,7 +121,7 @@ class SeverManager():
 
 
     # Msg related functions
-    def pend_message(self, token: str, receiver: str, message: str):
+    def pend_message(self, token: str, receiver: str, message: bytes):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
             cursor = conn.cursor()
             sender = self.get_jwt_user(token)
@@ -139,9 +140,23 @@ class SeverManager():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            cursor.execute("SELECT * FROM pending_messages WHERE receiver = ?", (username,))
-            messages = [dict(row) for row in cursor.fetchall()]
-            
+            cursor.execute("SELECT sender, content, date FROM pending_messages WHERE receiver = ?", (username,))
+            rows = cursor.fetchall()
+    
+            messages = []
+            for row in rows:
+                sender = row[0]
+                blob_content = row[1]  
+                date = row[2]
+                
+                encoded_content = base64.b64encode(blob_content).decode('utf-8')
+                
+                messages.append({
+                    "sender": sender,
+                    "content": encoded_content,
+                    "date": date
+                })
+                
             if messages:
                 cursor.execute("DELETE FROM pending_messages WHERE receiver = ?", (username,))
                 conn.commit()

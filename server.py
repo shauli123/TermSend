@@ -13,6 +13,7 @@ import server_manager
 import threading
 import exceptions
 import json
+import base64
 
 pub_pem, priv_pem = crypt.generate_server_keys()
 
@@ -65,7 +66,7 @@ def handle_request(request: proto.Message, server: server_manager.SeverManager) 
         # Send msg
         elif request.command == proto.ServerCommands.SEND_MSG:
             try: 
-                server.pend_message(request.jwt, request.json["receiver"], request.json["message"])
+                server.pend_message(request.jwt, request.json["receiver"], base64.b64decode(request.json["message"]))
                 status_code, res_json = proto.ServerStatus.SENT, {}
             except exceptions.UserDoesntExist as e:
                 status_code, res_json = proto.ServerStatus.INVALID_USER, {"error": str(e)}
@@ -75,7 +76,7 @@ def handle_request(request: proto.Message, server: server_manager.SeverManager) 
         elif request.command == proto.ServerCommands.RECEIVE_MSGS:
             try: 
                 msgs = server.get_pending_messages(request.jwt)
-                status_code, res_json = proto.ServerStatus.OK, {'messages':msgs}
+                status_code, res_json = proto.ServerStatus.OK, {'messages': msgs}
             except exceptions.TokenError as e:
                 status_code, res_json = proto.ServerStatus.TOKEN_ERROR, {"error": str(e)}
         else:

@@ -17,8 +17,8 @@ def generate_server_keys():
     ).decode('utf-8')
     return public_pem, private_pem
 
-def rsa_decrypt(encrypted_blob, priv_pem):
-    private_key = serialization.load_pem_private_key(priv_pem.encode('utf-8'), password=None)
+def rsa_decrypt(encrypted_blob, priv_pem: str):
+    private_key = serialization.load_pem_private_key(priv_pem.encode(), password=None)
     decrypted = private_key.decrypt(
         encrypted_blob,
         padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)

@@ -1,11 +1,14 @@
 import encryption as crypt
 import socket
 import json
+import exceptions
 import core.protocol as proto
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import Fernet
 from core import network
+import base64
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5050
@@ -31,16 +34,93 @@ def send_request(msg: str):
         
         return proto.Message(network.recv_msg(sock), cipher, proto.Side.SERVER) 
         
-        
+def route_error(code: int, res: proto.Message):
+    if code == proto.ServerStatus.INVALID_USER:
+        raise exceptions.UserDoesntExist(res.json["error"])
+    elif code == proto.ServerStatus.LOGIN_ERROR:
+        raise exceptions.InvalidCredentials(res.json["error"])
+    elif code == proto.ServerStatus.REGISTER_ERROR:
+        raise exceptions.UserAlreadyExists(res.json["error"])
+    elif code == proto.ServerStatus.TOKEN_ERROR:
+        raise exceptions.TokenError(res.json["error"])
+    elif code == proto.ServerStatus.UNSUPPORTED_COMMAND or code == proto.ServerStatus.SERVER_ERROR:
+        raise exceptions.UserError("An error occurred, Please try again later")
+
 def register(username: str, password: str):
     # genrate keys
     public_pem, private_pem = crypt.generate_server_keys()
-    user_key = Fernet(f"{username};{password}".encode())
-    enc_private_pem = user_key.encrypt(private_pem)
-
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=username.encode(),
+        iterations=100000,
+    )
+    user_key = Fernet(base64.urlsafe_b64encode(kdf.derive(password.encode())))
+    enc_private_pem = user_key.encrypt(private_pem.encode())
+    
+    # Send Request 
     req_json = {
-
-
+        "username": username,
+        "password": password,
+        "public_key": public_pem,
+        "encrypted_private_key":  base64.b64encode(enc_private_pem).decode('utf-8')
     }
     
-    send_request(f"{proto.ServerCommands.REGISTER}||{json.dumps(req_json)}")
+    res = send_request(f"{proto.ServerCommands.REGISTER}|NONE|{json.dumps(req_json)}")
+    if not (200 <= res.status < 300):
+        route_error(res.status, res)
+
+def login(username: str, password: str):
+    req_json = {
+        "username": username,
+        "password": password,
+    }
+    
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=username.encode(),
+        iterations=100000,
+    )
+    user_key = Fernet(base64.urlsafe_b64encode(kdf.derive(password.encode())))
+    
+    res = send_request(f"{proto.ServerCommands.LOGIN}|NONE|{json.dumps(req_json)}")
+    if (200 <= res.status < 300):
+        return res.json['jwt'], user_key.decrypt(base64.b64decode(res.json['enc_private_key']).decode()).decode()
+    else:
+        route_error(res.status, res)
+
+def send_msg(token: str, receiver: str, msg: str):
+    req_json = {
+        "username": receiver
+    }
+    
+    res = send_request(f"{proto.ServerCommands.GET_PUBLIC_KEY}|NONE|{json.dumps(req_json)}")
+    
+    if (200 <= res.status < 300):
+        public_key = res.json['public_key']
+        enc_msg = crypt.rsa_encrypt(msg.encode(), public_key)
+        
+        req_json = {
+            "receiver": receiver,
+            "message": base64.b64encode(enc_msg).decode('utf-8')
+        }
+        
+        res = send_request(f'{proto.ServerCommands.SEND_MSG}|{token}|{json.dumps(req_json)}')
+        
+        if not (200 <= res.status < 300):
+            route_error(res.status, res)
+    else:
+        route_error(res.status, res)
+
+def receive_msgs(token: str, private_key: str):
+    res = send_request(f"{proto.ServerCommands.RECEIVE_MSGS}|{token}|{"{}"}")
+    if not (200 <= res.status < 300):
+            route_error(res.status, res)
+    else:
+        msgs = res.json['messages']
+        for i, msg in enumerate(msgs):
+            msgs[i]["content"] = crypt.rsa_decrypt(base64.b64decode(msg["content"]), private_key).decode()
+            
+    return msgs
+            
