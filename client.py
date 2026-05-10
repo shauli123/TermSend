@@ -1,5 +1,6 @@
 import client_network
 import sqlite3
+import os
 
 private_key = None
 CLIENT_DB_PATH = 'client.db'
@@ -41,3 +42,36 @@ def fetch_and_get_all_msgs(token):
 
         return all_messages
 
+def print_banner():
+    C1 = "\033[38;5;45m"
+    C2 = "\033[38;5;208m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+
+    logo = [
+        (r"  _____                     ", r"____                _ "),
+        (r" |_   _|__ _ __ _ __ ___  ", r"/ ___|  ___ _ __   __| |"),
+        (r"   | |/ _ \ '__| '_ ` _ \ ", r"\___ \ / _ \ '_ \ / _` |"),
+        (r"   | |  __/ |  | | | | | |", r" ___) |  __/ | | | (_| |"),
+        (r"   |_|\___|_|  |_| |_| |_|", r"|____/ \___|_| |_|\__,_|")
+    ]
+
+    slogan = ">> Secure TUI Messaging: Simple. Encrypted. RSA-Hardened. <<"
+
+    try:
+        columns = os.get_terminal_size().columns
+    except OSError:
+        columns = 80
+
+    for part1, part2 in logo:
+        full_line = part1 + part2
+        padding = (columns - len(full_line)) // 2
+        print(" " * padding + f"{C1}{BOLD}{part1}{C2}{part2}{RESET}")
+
+    print(f"{C1}{BOLD}{slogan.center(columns)}{RESET}")
+    
+def main():
+    print_banner()
+
+if __name__ == '__main__':
+    main()
