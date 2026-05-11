@@ -42,7 +42,8 @@ def fetch_and_get_all_msgs(token):
                 "content": row[1],
                 "date": row[2]
             })
-
+        all_messages.sort(key=lambda x: x["date"])
+        
         return all_messages
 
 def print_banner():
@@ -166,20 +167,110 @@ def login_register_menu():
     print(f"Logged in into {username}.")
     return token
 
+def send_msg(token):
+    receiver = input("Enter the recipient: ")
+    
+    print("Enter your message (type a blank new line to finish):")
+    text = []
+    while True:
+        line = input()
+        if line == "":
+            break
+        text.append(line)
+    text = "\n".join(text)
 
+    while True:
+        try:
+            client_network.send_msg(token, receiver, text)
+        except exceptions.UserDoesntExist as e:
+            print("Recipient Doesnt Exist! Try Again!")
+            receiver = input("Enter the recipient: ")
+        else:
+            break
+        
+def print_msg(msg: dict):
+    print(f"Sender: {msg['sender']}")
+    print(f"Date: {msg['date']}")
+    print(msg['content'])
+    print('-'*30)
+
+def show_all_messages(token):
+    msgs = fetch_and_get_all_msgs(token)
+    for msg in msgs:
+        print_msg(msg)
+
+def show_msgs_from_user(token):
+    sender = input("Enter the sender to search: ")
+    msgs = fetch_and_get_all_msgs(token)
+    
+    for msg in msgs:
+        if msg['sender'] == sender:
+            print_msg(msg)
+
+def show_all_msgs_with_str(token):
+    string = input("Enter the string to search: ")
+    msgs = fetch_and_get_all_msgs(token)
+    
+    for msg in msgs:
+        if string in msg['content']:
+            print_msg(msg)
+            
+def show_recent_msgs(token):
+    msgs = fetch_and_get_all_msgs(token)
+    amount = 0
+
+    while True:
+        try:
+            amount = int(input("Enter your choice: "))
+        except ValueError as e:
+            print("NaN! Try again!")
+        else:
+            if(len(msgs) < amount):
+                print(f"There are only {len(msgs)}! Try Again!")
+            else:
+                break
+            
+    for msg in msgs[:amount]:
+        print_msg(msg)
+    
 def main():
+    option_list = {
+        1: send_msg,
+        2: show_all_messages,
+        3: show_msgs_from_user,
+        4: show_all_msgs_with_str,
+        5: show_recent_msgs,
+        6: None
+    }
     print_banner()
     choose_server()
     token = login_register_menu()
     while True:
-        # print("Choose an option:")
-        # print("\t1. Send a message.")
-        # print("\t2. Show all messages.")
-        # print("\t3. Show all messages from a specific user.")
-        # print("\t4. Show all messages containing a string.")
-        # print("\t5. Exit the program.")
-        pass
-
+        print("Choose an option:")
+        print("\t1. Send a message.")
+        print("\t2. Show all messages.")
+        print("\t3. Show all messages from a specific user.")
+        print("\t4. Show all messages containing a string.")
+        print("\t5. Show recent messages.")
+        print("\t6. Exit the program.")
+        
+        option = 0
+        while option not in option_list.keys():
+            try:
+                option = int(input("Enter your choice: "))
+            except ValueError as e:
+                print("Try again!")
+        
+        if option_list[option] == None:
+            break
+        
+        try:
+            option_list[option](token)
+        except exceptions.TokenError as e:
+            print("Your session has expired! Please Re-login!")
+            token = login_register_menu()
+        except Exception as e:
+            print(f"An error occurred!\nError: {e}.\nplease try again later! ")
         
 
 if __name__ == '__main__':
