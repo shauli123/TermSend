@@ -229,7 +229,7 @@ def show_recent_msgs(token):
                 print(f"There are only {len(msgs)}! Try Again!")
             else:
                 break
-    msgs == msgs[::-1]     
+    msgs = msgs[::-1]     
     for msg in msgs[:amount]:
         print_msg(msg)
     
