@@ -12,7 +12,7 @@ def fetch_and_get_all_msgs(token):
     if private_key is None:
         return []
 
-    new_msgs = client_network.receive_msgs(token)
+    new_msgs = client_network.receive_msgs(token, private_key)
 
     with sqlite3.connect(CLIENT_DB_PATH) as conn:
         cursor = conn.cursor()
@@ -229,7 +229,7 @@ def show_recent_msgs(token):
                 print(f"There are only {len(msgs)}! Try Again!")
             else:
                 break
-            
+    msgs == msgs[::-1]     
     for msg in msgs[:amount]:
         print_msg(msg)
     
