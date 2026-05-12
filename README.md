@@ -15,7 +15,6 @@ TermSend is built in Python
     *   [Setting up the environment (Server & Python Client)](#setting-up-the-environment)
     *   [Setting up Server](#setting-up-server)
     *   [Running & using client](#running--using-client)
-*   [Setting up the environment](#setting-up-the-environment)
 
 ## Features:
 
@@ -66,3 +65,46 @@ python server.py
 # On Linux/Mac
 python3 server.py
 ```
+
+### **Running & using client**
+Run client.py using python
+then this menu will pop-up
+
+#### Connecting to server
+```
+Choose an option:
+        1. Stay on localhost:5050 server.
+        2. Connect to a different server.
+Enter your choice: 
+```
+if the default server runs on your pc(for testing) press 1.
+else connect to the server you will be using by pressing 2 nad entering the server ip & port
+
+#### Login / Signup
+if connected successfully you will be prompted with this menu:
+```
+Choose an option:
+        1. Sign Up to a new account.
+        2. Sign In to an existing account.
+Enter your choice: 
+```
+
+you can create a new account or login to an already existing account.
+if you sign up you will be auto logged in.
+when something went wrong an error will pop-up and ask you to fill again.
+
+#### Using the client
+this is the action menu do as you want
+```
+Choose an option:
+        1. Send a message.
+        2. Show all messages.
+        3. Show all messages from a specific user.
+        4. Show all messages containing a string.
+        5. Show recent messages.
+        6. Exit the program.
+Enter your choice:
+```
+for each option if it needs more data it will ask for it
+for example option 3 asks for a username
+
