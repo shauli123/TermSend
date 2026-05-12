@@ -33,7 +33,7 @@ def fetch_and_get_all_msgs(token):
             for msg in new_msgs:
                 cursor.execute("""
                     INSERT INTO msgs (user, sender, content, date) 
-                    VALUES (?, ?, ?)
+                    VALUES (?, ?, ?, ?)
                 """, (current_username, msg['sender'], msg['content'], msg['date']))
             conn.commit()
 
@@ -228,7 +228,7 @@ def show_recent_msgs(token):
 
     while True:
         try:
-            amount = int(input("Enter your choice: "))
+            amount = int(input("Enter how many recent message to show: "))
         except ValueError as e:
             print("NaN! Try again!")
         else:
