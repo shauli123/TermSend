@@ -16,6 +16,7 @@ import json
 import base64
 
 pub_pem, priv_pem = crypt.generate_server_keys()
+SERVER_PORT = 5050
 
 def handle_client(sock: socket.socket, server: server_manager.SeverManager, addr):
     # Send Public Key
@@ -90,9 +91,9 @@ def main():
     server = server_manager.SeverManager()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_sock:
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_sock.bind(('', 5050))
+        server_sock.bind(('', SERVER_PORT))
         server_sock.listen()
-        print("[LISTENING] Server_sock is listening on 5050")
+        print(f"[LISTENING] Server_sock is listening on {SERVER_PORT}")
 
         while True:
             conn, addr = server_sock.accept()

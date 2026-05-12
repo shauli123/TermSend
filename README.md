@@ -54,3 +54,15 @@ source venv/bin/activate
 # Installing the requirements
 pip install -r requirements.txt
 ```
+
+### **Setting up server**
+In server.py change the SERVER_PORT to whatever port you would like!
+
+Then to run the server run:
+```
+# On Windows
+python server.py
+
+# On Linux/Mac
+python3 server.py
+```
