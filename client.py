@@ -6,9 +6,13 @@ import ipaddress
 import socket
 
 private_key = None
+current_username = None
 CLIENT_DB_PATH = 'client.db'
 
 def fetch_and_get_all_msgs(token):
+    global private_key
+    global current_username
+
     if private_key is None:
         return []
 
@@ -20,6 +24,7 @@ def fetch_and_get_all_msgs(token):
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS msgs (
                 sender TEXT NOT NULL,
+                user TEXT NOT NULL,
                 content TEXT NOT NULL,
                 date TEXT
             );""")
@@ -27,12 +32,12 @@ def fetch_and_get_all_msgs(token):
         if new_msgs:
             for msg in new_msgs:
                 cursor.execute("""
-                    INSERT INTO msgs (sender, content, date) 
+                    INSERT INTO msgs (user, sender, content, date) 
                     VALUES (?, ?, ?)
-                """, (msg['sender'], msg['content'], msg['date']))
+                """, (current_username, msg['sender'], msg['content'], msg['date']))
             conn.commit()
 
-        cursor.execute("SELECT sender, content, date FROM msgs")
+        cursor.execute("SELECT sender, content, date FROM msgs WHERE user=?", (current_username,))
         rows = cursor.fetchall()
 
         all_messages = []
@@ -127,6 +132,7 @@ def choose_server():
 
 def login_register_menu():
     token = None
+    global current_username
     global private_key
     while not token:
         print("Choose an option:")
@@ -165,6 +171,7 @@ def login_register_menu():
 
                     
     print(f"Logged in into {username}.")
+    current_username = username
     return token
 
 def send_msg(token):
