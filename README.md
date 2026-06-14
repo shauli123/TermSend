@@ -2,11 +2,12 @@
 
 **TermSend** is a mail-like, tui based messging system that uses: sockets, encryption and sqllite.
 
-TermSend is built in Python
+TermSend is built in Python 3.11+
+![Demo Video](https://youtu.be/CFBe1q23t8Q)
 
 **Screenshot:**
-
 ![](https://cdn.hackclub.com/019e1b53-636c-738b-bdc3-43ae2fb8b7b5/image.png)
+
 
 ## Table of Contents
 
