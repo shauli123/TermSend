@@ -114,7 +114,7 @@ def send_msg(token: str, receiver: str, msg: str):
         route_error(res.status, res)
 
 def receive_msgs(token: str, private_key: str):
-    res = send_request(f"{proto.ServerCommands.RECEIVE_MSGS}|{token}|{"{}"}")
+    res = send_request(f"{proto.ServerCommands.RECEIVE_MSGS}|{token}|{{}}")
     if not (200 <= res.status < 300):
             route_error(res.status, res)
     else:
