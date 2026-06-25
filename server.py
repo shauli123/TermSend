@@ -17,6 +17,7 @@ import base64
 
 pub_pem, priv_pem = crypt.generate_server_keys()
 SERVER_PORT = 5050
+SOCK_FAMILY = socket.AF_INET
 
 def handle_client(sock: socket.socket, server: server_manager.SeverManager, addr):
     # Send Public Key
@@ -89,7 +90,7 @@ def handle_request(request: proto.Message, server: server_manager.SeverManager) 
 
 def main():
     server = server_manager.SeverManager()
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_sock:
+    with socket.socket(SOCK_FAMILY, socket.SOCK_STREAM) as server_sock:
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_sock.bind(('', SERVER_PORT))
         server_sock.listen()

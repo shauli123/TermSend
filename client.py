@@ -79,10 +79,10 @@ def print_banner():
 
     print(f"{C1}{BOLD}{slogan.center(columns)}{RESET}")
 
-def check_connection(host: str, port: int, timeout=3):
+def check_connection(host: str, port: int, sock_family, timeout=3):
     try:
         socket.setdefaulttimeout(timeout)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        with socket.socket(sock_family, socket.SOCK_STREAM) as s:
             s.connect((host, port))
         return True
     except (socket.timeout, socket.error):
@@ -107,9 +107,17 @@ def choose_server():
                 try:
                     ipaddress.IPv4Address(ip)
                 except ValueError:
-                    print("Not a valid ip! Try again!")
+                    try:
+                        ipaddress.IPv6Address(ip)
+                    except ValueError:
+                        print("Not a valid ip! Try again!")
+                    else:
+                        client_network.SERVER_IP = ip
+                        client_network.SOCK_FAMILY = socket.AF_INET6
+                        break
                 else:
                     client_network.SERVER_IP = ip
+                    client_network.SOCK_FAMILY = socket.AF_INET
                     break
                     
             port = -1
@@ -121,7 +129,7 @@ def choose_server():
                     print("Try again!")
                     
             client_network.SERVER_PORT = port
-        if check_connection(client_network.SERVER_IP, client_network.SERVER_PORT):
+        if check_connection(client_network.SERVER_IP, client_network.SERVER_PORT, client_network.SOCK_FAMILY):
             is_ok = True
             print("Connected to server successfully!")
         else:

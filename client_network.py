@@ -13,8 +13,10 @@ import base64
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5050
 
+SOCK_FAMILY = socket.AF_INET
+
 def send_request(msg: str):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    with socket.socket(SOCK_FAMILY, socket.SOCK_STREAM) as sock:
         sock.connect((SERVER_IP, SERVER_PORT))
         # Get public key
         server_pub_pem = network.recv_msg(sock).decode('utf-8')
