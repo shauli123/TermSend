@@ -5,7 +5,7 @@
 TermSend is built in Python 3.11+
 
 **Demo Video:**
-[![Watch the video](https://youtu.be/CFBe1q23t8Q)](https://youtu.be/CFBe1q23t8Q)
+[Watch the video](https://youtu.be/CFBe1q23t8Q)
 
 
 **Screenshot:**
