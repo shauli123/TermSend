@@ -1,96 +1,12 @@
 import client_network
-import sqlite3
 import os
 import exceptions
 import ipaddress
 import socket
-import hashlib
-import base64
-from cryptography.fernet import Fernet
 from rich.console import Console
 from rich.markdown import Markdown
-from datetime import datetime
+import client_util
 
-private_key = None
-current_username = None
-current_password = None
-
-CLIENT_DB_PATH = 'client.db'
-
-def fetch_and_get_all_msgs(token):
-    global private_key
-    global current_username
-    global current_password
-
-    if private_key is None:
-        return []
-
-    new_msgs = client_network.receive_msgs(token, private_key)
-    
-    
-    hashed = hashlib.sha256(f"{current_username}.{current_password}".encode()).digest()
-    key = Fernet(base64.urlsafe_b64encode(hashed))
-    
-    with sqlite3.connect(CLIENT_DB_PATH) as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS msgs (
-                sender TEXT NOT NULL,
-                receiver TEXT NOT NULL,
-                user TEXT NOT NULL,
-                content BLOB NOT NULL,
-                thread_id INTEGER NOT NULL,
-                date TEXT
-            );""")
-
-        if new_msgs:
-            for msg in new_msgs:
-                cursor.execute("""
-                    INSERT INTO msgs (user, sender, content, date, receiver, thread_id) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (current_username, msg['sender'], key.encrypt(msg['content'].encode()), msg['date'], current_username, msg['thread_id']))
-            conn.commit()
-
-        cursor.execute("SELECT sender, receiver, content, date, thread_id FROM msgs WHERE user=?", (current_username,))
-        rows = cursor.fetchall()
-
-        all_messages = []
-        for row in rows:
-            all_messages.append({
-                "sender": row[0],
-                "receiver": row[1],
-                "content": key.decrypt(row[2]).decode('utf-8'),
-                "date": row[3],
-                "thread_id": row[4]
-            })
-        
-        unique_messages = [dict(t) for t in {tuple(d.items()) for d in all_messages}]
-        unique_messages.sort(key=lambda x: x["date"])
-        
-        return unique_messages
-
-def insert_msg_to_db(sender, receiver, content, thread_id, date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")):
-    with sqlite3.connect(CLIENT_DB_PATH) as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-           CREATE TABLE IF NOT EXISTS msgs (
-               sender TEXT NOT NULL,
-               receiver TEXT NOT NULL,
-               user TEXT NOT NULL,
-               content BLOB NOT NULL,
-               thread_id INTEGER NOT NULL,
-               date TEXT
-           );""")
-        
-        hashed = hashlib.sha256(f"{current_username}.{current_password}".encode()).digest()
-        key = Fernet(base64.urlsafe_b64encode(hashed))
-        cursor.execute("""
-            INSERT INTO msgs (user, sender, content, date, receiver, thread_id) 
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (current_username, sender, key.encrypt(content.encode()), date, receiver, thread_id))
-        conn.commit()
         
 def print_banner():
     C1 = "\033[38;5;45m"
@@ -120,14 +36,6 @@ def print_banner():
 
     print(f"{C1}{BOLD}{slogan.center(columns)}{RESET}")
 
-def check_connection(host: str, port: int, sock_family, timeout=3):
-    try:
-        socket.setdefaulttimeout(timeout)
-        with socket.socket(sock_family, socket.SOCK_STREAM) as s:
-            s.connect((host, port))
-        return True
-    except (socket.timeout, socket.error):
-        return False
     
 def choose_server():
     is_ok = False
@@ -170,7 +78,7 @@ def choose_server():
                     print("Try again!")
                     
             client_network.SERVER_PORT = port
-        if check_connection(client_network.SERVER_IP, client_network.SERVER_PORT, client_network.SOCK_FAMILY):
+        if client_util.check_connection(client_network.SERVER_IP, client_network.SERVER_PORT, client_network.SOCK_FAMILY):
             is_ok = True
             print("Connected to server successfully!")
         else:
@@ -181,9 +89,6 @@ def choose_server():
 
 def login_register_menu():
     token = None
-    global current_username
-    global current_password
-    global private_key
     
     while not token:
         print("Choose an option:")
@@ -207,14 +112,14 @@ def login_register_menu():
                 except Exception as e:
                     print(f"Error: {e}")
                 else:
-                    token, private_key = client_network.login(username, password)
+                    token, client_util.private_key = client_network.login(username, password)
                     finished = True
         elif option == 2:
             username = input("Enter a username: ")
             password = input("Enter a password: ")
             
             try:
-                token, private_key = client_network.login(username, password)
+                token, client_util.private_key = client_network.login(username, password)
             except Exception as e:
                     print(f"Error: {e}")
             else:
@@ -222,8 +127,8 @@ def login_register_menu():
 
                     
     print(f"Logged in into {username}.")
-    current_username = username
-    current_password = password
+    client_util.current_username = username
+    client_util.current_password = password
     return token
 
 def send_msg(token):
@@ -245,8 +150,8 @@ def send_msg(token):
     while True:
         try:
             res = client_network.send_msg(token, receiver, text, thread_id)
-            if receiver != current_username:
-                insert_msg_to_db(current_username, receiver, text, res['thread_id'])
+            if receiver != client_util.current_username:
+                client_util.insert_msg_to_db(client_util.current_username, receiver, text, res['thread_id'])
         except exceptions.UserDoesntExist as e:
             print("Recipient Doesnt Exist! Try Again!")
             receiver = input("Enter the recipient: ")
@@ -262,13 +167,13 @@ def print_msg(msg: dict):
     print('-'*30)
 
 def show_all_messages(token):
-    msgs = fetch_and_get_all_msgs(token)
+    msgs = client_util.fetch_and_get_all_msgs(token)
     for msg in msgs:
         print_msg(msg)
 
 def show_msgs_from_user(token):
     sender = input("Enter the sender to search: ")
-    msgs = fetch_and_get_all_msgs(token)
+    msgs = client_util.fetch_and_get_all_msgs(token)
     
     for msg in msgs:
         if msg['sender'] == sender:
@@ -276,14 +181,14 @@ def show_msgs_from_user(token):
 
 def show_all_msgs_with_str(token):
     string = input("Enter the string to search: ")
-    msgs = fetch_and_get_all_msgs(token)
+    msgs = client_util.fetch_and_get_all_msgs(token)
     
     for msg in msgs:
         if string in msg['content']:
             print_msg(msg)
             
 def show_recent_msgs(token):
-    msgs = fetch_and_get_all_msgs(token)
+    msgs = client_util.fetch_and_get_all_msgs(token)
     amount = 0
 
     while True:
@@ -306,7 +211,7 @@ def show_all_msgs_in_thread(token):
     except:
         print("Not a number, try again later!")
         
-    msgs = fetch_and_get_all_msgs(token)
+    msgs = client_util.fetch_and_get_all_msgs(token)
     
     for msg in msgs:
         if msg['thread_id'] == id:
