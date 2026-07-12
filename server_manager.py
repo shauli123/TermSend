@@ -37,6 +37,7 @@ class SeverManager():
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
             content BLOB NOT NULL,
+            key BLOB NOT NULL,
             date TEXT DEFAULT (datetime('now', 'localtime')), 
             FOREIGN KEY (sender) REFERENCES users(username),
             FOREIGN KEY (receiver) REFERENCES users(username)
@@ -121,15 +122,15 @@ class SeverManager():
 
 
     # Msg related functions
-    def pend_message(self, token: str, receiver: str, message: bytes):
+    def pend_message(self, token: str, receiver: str, message: bytes, key: bytes):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
             cursor = conn.cursor()
             sender = self.get_jwt_user(token)
             if self.user_exists(receiver):
                 cursor.execute("""
-                INSERT INTO pending_messages (sender, receiver, content)
-                VALUES (?, ?, ?)
-                """, (sender, receiver, message))
+                INSERT INTO pending_messages (sender, receiver, content, key)
+                VALUES (?, ?, ?, ?)
+                """, (sender, receiver, message, key))
                 conn.commit()
             else:
                 raise exceptions.UserDoesntExist("The user you are trying to send to doesn't exist!")
@@ -140,7 +141,7 @@ class SeverManager():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            cursor.execute("SELECT sender, content, date FROM pending_messages WHERE receiver = ?", (username,))
+            cursor.execute("SELECT sender, content, date, key FROM pending_messages WHERE receiver = ?", (username,))
             rows = cursor.fetchall()
     
             messages = []
@@ -148,13 +149,16 @@ class SeverManager():
                 sender = row[0]
                 blob_content = row[1]  
                 date = row[2]
+                key = row[3]
                 
                 encoded_content = base64.b64encode(blob_content).decode('utf-8')
+                encoded_key = base64.b64encode(key).decode('utf-8')
                 
                 messages.append({
                     "sender": sender,
                     "content": encoded_content,
-                    "date": date
+                    "date": date,
+                    "key": encoded_key
                 })
                 
             if messages:

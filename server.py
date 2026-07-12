@@ -68,7 +68,7 @@ def handle_request(request: proto.Message, server: server_manager.SeverManager) 
         # Send msg
         elif request.command == proto.ServerCommands.SEND_MSG:
             try: 
-                server.pend_message(request.jwt, request.json["receiver"], base64.b64decode(request.json["message"]))
+                server.pend_message(request.jwt, request.json["receiver"], base64.b64decode(request.json["message"]), base64.b64decode(request.json["key"]))
                 status_code, res_json = proto.ServerStatus.SENT, {}
             except exceptions.UserDoesntExist as e:
                 status_code, res_json = proto.ServerStatus.INVALID_USER, {"error": str(e)}
