@@ -104,7 +104,7 @@ def get_public_key(username: str):
     else:
         route_error(res.status, res)
         
-def send_msg(token: str, receiver: str, msg: str):
+def send_msg(token: str, receiver: str, msg: str, thread_id: int = None):
     req_json = {
         "username": receiver
     }
@@ -126,10 +126,15 @@ def send_msg(token: str, receiver: str, msg: str):
             "key": base64.b64encode(enc_key).decode('utf-8')
         }
         
+        if thread_id is not None:
+            req_json['thread_id'] = thread_id
+        
         res = send_request(f'{proto.ServerCommands.SEND_MSG}|{token}|{json.dumps(req_json)}')
         
         if not (200 <= res.status < 300):
             route_error(res.status, res)
+            
+        return res.json
     else:
         route_error(res.status, res)
 

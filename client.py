@@ -9,6 +9,7 @@ import base64
 from cryptography.fernet import Fernet
 from rich.console import Console
 from rich.markdown import Markdown
+from datetime import datetime
 
 private_key = None
 current_username = None
@@ -36,33 +37,61 @@ def fetch_and_get_all_msgs(token):
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS msgs (
                 sender TEXT NOT NULL,
+                receiver TEXT NOT NULL,
                 user TEXT NOT NULL,
                 content BLOB NOT NULL,
+                thread_id INTEGER NOT NULL,
                 date TEXT
             );""")
 
         if new_msgs:
             for msg in new_msgs:
                 cursor.execute("""
-                    INSERT INTO msgs (user, sender, content, date) 
-                    VALUES (?, ?, ?, ?)
-                """, (current_username, msg['sender'], key.encrypt(msg['content'].encode()), msg['date']))
+                    INSERT INTO msgs (user, sender, content, date, receiver, thread_id) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (current_username, msg['sender'], key.encrypt(msg['content'].encode()), msg['date'], current_username, msg['thread_id']))
             conn.commit()
 
-        cursor.execute("SELECT sender, content, date FROM msgs WHERE user=?", (current_username,))
+        cursor.execute("SELECT sender, receiver, content, date, thread_id FROM msgs WHERE user=?", (current_username,))
         rows = cursor.fetchall()
 
         all_messages = []
         for row in rows:
             all_messages.append({
                 "sender": row[0],
-                "content": key.decrypt(row[1]).decode('utf-8'),
-                "date": row[2]
+                "receiver": row[1],
+                "content": key.decrypt(row[2]).decode('utf-8'),
+                "date": row[3],
+                "thread_id": row[4]
             })
-        all_messages.sort(key=lambda x: x["date"])
         
-        return all_messages
+        unique_messages = [dict(t) for t in {tuple(d.items()) for d in all_messages}]
+        unique_messages.sort(key=lambda x: x["date"])
+        
+        return unique_messages
 
+def insert_msg_to_db(sender, receiver, content, thread_id, date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")):
+    with sqlite3.connect(CLIENT_DB_PATH) as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+           CREATE TABLE IF NOT EXISTS msgs (
+               sender TEXT NOT NULL,
+               receiver TEXT NOT NULL,
+               user TEXT NOT NULL,
+               content BLOB NOT NULL,
+               thread_id INTEGER NOT NULL,
+               date TEXT
+           );""")
+        
+        hashed = hashlib.sha256(f"{current_username}.{current_password}".encode()).digest()
+        key = Fernet(base64.urlsafe_b64encode(hashed))
+        cursor.execute("""
+            INSERT INTO msgs (user, sender, content, date, receiver, thread_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (current_username, sender, key.encrypt(content.encode()), date, receiver, thread_id))
+        conn.commit()
+        
 def print_banner():
     C1 = "\033[38;5;45m"
     C2 = "\033[38;5;208m"
@@ -200,6 +229,10 @@ def login_register_menu():
 def send_msg(token):
     receiver = input("Enter the recipient: ")
     
+    thread_id = int(input("Enter Thread ID (if it is a new msg enter -1): "))
+    if thread_id == -1:
+        thread_id = None
+        
     print("Enter your message (you can use md) (type a blank new line to finish):")
     text = []
     while True:
@@ -211,7 +244,9 @@ def send_msg(token):
 
     while True:
         try:
-            client_network.send_msg(token, receiver, text)
+            res = client_network.send_msg(token, receiver, text, thread_id)
+            if receiver != current_username:
+                insert_msg_to_db(current_username, receiver, text, res['thread_id'])
         except exceptions.UserDoesntExist as e:
             print("Recipient Doesnt Exist! Try Again!")
             receiver = input("Enter the recipient: ")
@@ -220,8 +255,9 @@ def send_msg(token):
         
 def print_msg(msg: dict):
     print(f"Sender: {msg['sender']}")
+    print(f"Recipient: {msg['receiver']}")
     print(f"Date: {msg['date']}")
-    # print(msg['content'])
+    print(f"Thread ID: {msg['thread_id']}")
     Console().print(Markdown(msg['content']))
     print('-'*30)
 
@@ -263,7 +299,19 @@ def show_recent_msgs(token):
     msgs = msgs[::-1]     
     for msg in msgs[:amount]:
         print_msg(msg)
+        
+def show_all_msgs_in_thread(token):
+    try:
+        id = int(input("Enter the Thread ID to search: "))
+    except:
+        print("Not a number, try again later!")
+        
+    msgs = fetch_and_get_all_msgs(token)
     
+    for msg in msgs:
+        if msg['thread_id'] == id:
+            print_msg(msg)
+            
 def main():
     option_list = {
         1: send_msg,
@@ -271,7 +319,8 @@ def main():
         3: show_msgs_from_user,
         4: show_all_msgs_with_str,
         5: show_recent_msgs,
-        6: None
+        6: show_all_msgs_in_thread,
+        7: None
     }
     print_banner()
     choose_server()
@@ -283,8 +332,9 @@ def main():
         print("\t3. Show all messages from a specific user.")
         print("\t4. Show all messages containing a string.")
         print("\t5. Show recent messages.")
-        print("\t6. Exit the program.")
-        
+        print("\t6. Show replay thread.")
+        print("\t7. Exit the program.")
+       
         option = 0
         while option not in option_list.keys():
             try:

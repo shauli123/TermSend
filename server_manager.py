@@ -33,15 +33,23 @@ class SeverManager():
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("""
+            CREATE TABLE IF NOT EXISTS threads (
+            thread_id INTEGER PRIMARY KEY AUTOINCREMENT
+            );""")
+            
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS pending_messages (
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
             content BLOB NOT NULL,
             key BLOB NOT NULL,
             date TEXT DEFAULT (datetime('now', 'localtime')), 
+            thread_id INTEGER NOT NULL, 
             FOREIGN KEY (sender) REFERENCES users(username),
-            FOREIGN KEY (receiver) REFERENCES users(username)
+            FOREIGN KEY (receiver) REFERENCES users(username),
+            FOREIGN KEY (thread_id) REFERENCES threads(thread_id)
             );""")
+
             conn.commit()
 
     
@@ -122,16 +130,29 @@ class SeverManager():
 
 
     # Msg related functions
-    def pend_message(self, token: str, receiver: str, message: bytes, key: bytes):
+    def pend_message(self, token: str, receiver: str, message: bytes, key: bytes, thread_id: int = None):
         with sqlite3.connect(self.SERVER_DB_PATH) as conn:
             cursor = conn.cursor()
             sender = self.get_jwt_user(token)
             if self.user_exists(receiver):
+                
+                if thread_id is not None:
+                    cursor.execute("SELECT EXISTS(SELECT 1 FROM threads WHERE thread_id = ?);", (thread_id,))
+                    exists = cursor.fetchone()[0]
+                    if not exists:
+                        thread_id = None
+                        
+                if thread_id is None:
+                    cursor.execute('INSERT INTO threads DEFAULT VALUES RETURNING thread_id;')
+                    thread_id = cursor.fetchone()[0]
+
                 cursor.execute("""
-                INSERT INTO pending_messages (sender, receiver, content, key)
-                VALUES (?, ?, ?, ?)
-                """, (sender, receiver, message, key))
+                INSERT INTO pending_messages (sender, receiver, content, key, thread_id)
+                VALUES (?, ?, ?, ?, ?)
+                """, (sender, receiver, message, key, thread_id))
                 conn.commit()
+                
+                return thread_id
             else:
                 raise exceptions.UserDoesntExist("The user you are trying to send to doesn't exist!")
 
@@ -141,7 +162,7 @@ class SeverManager():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            cursor.execute("SELECT sender, content, date, key FROM pending_messages WHERE receiver = ?", (username,))
+            cursor.execute("SELECT sender, content, date, key, thread_id FROM pending_messages WHERE receiver = ?", (username,))
             rows = cursor.fetchall()
     
             messages = []
@@ -150,6 +171,7 @@ class SeverManager():
                 blob_content = row[1]  
                 date = row[2]
                 key = row[3]
+                thread_id = row[4]
                 
                 encoded_content = base64.b64encode(blob_content).decode('utf-8')
                 encoded_key = base64.b64encode(key).decode('utf-8')
@@ -158,7 +180,8 @@ class SeverManager():
                     "sender": sender,
                     "content": encoded_content,
                     "date": date,
-                    "key": encoded_key
+                    "key": encoded_key,
+                    "thread_id": thread_id
                 })
                 
             if messages:
