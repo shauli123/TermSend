@@ -4,6 +4,8 @@ import os
 import exceptions
 import ipaddress
 import socket
+from rich.console import Console
+from rich.markdown import Markdown
 
 private_key = None
 current_username = None
@@ -185,7 +187,7 @@ def login_register_menu():
 def send_msg(token):
     receiver = input("Enter the recipient: ")
     
-    print("Enter your message (type a blank new line to finish):")
+    print("Enter your message (you can use md) (type a blank new line to finish):")
     text = []
     while True:
         line = input()
@@ -206,7 +208,8 @@ def send_msg(token):
 def print_msg(msg: dict):
     print(f"Sender: {msg['sender']}")
     print(f"Date: {msg['date']}")
-    print(msg['content'])
+    # print(msg['content'])
+    Console().print(Markdown(msg['content']))
     print('-'*30)
 
 def show_all_messages(token):
