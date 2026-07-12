@@ -92,6 +92,18 @@ def login(username: str, password: str):
     else:
         route_error(res.status, res)
 
+def get_public_key(username: str):
+    req_json = {
+        "username": username
+    }
+    
+    res = send_request(f"{proto.ServerCommands.GET_PUBLIC_KEY}|NONE|{json.dumps(req_json)}")
+    if (200 <= res.status < 300):
+        public_key = res.json['public_key']
+        return public_key
+    else:
+        route_error(res.status, res)
+        
 def send_msg(token: str, receiver: str, msg: str):
     req_json = {
         "username": receiver

@@ -4,22 +4,32 @@ import os
 import exceptions
 import ipaddress
 import socket
+import hashlib
+import base64
+from cryptography.fernet import Fernet
 from rich.console import Console
 from rich.markdown import Markdown
 
 private_key = None
 current_username = None
+current_password = None
+
 CLIENT_DB_PATH = 'client.db'
 
 def fetch_and_get_all_msgs(token):
     global private_key
     global current_username
+    global current_password
 
     if private_key is None:
         return []
 
     new_msgs = client_network.receive_msgs(token, private_key)
-
+    
+    
+    hashed = hashlib.sha256(f"{current_username}.{current_password}".encode()).digest()
+    key = Fernet(base64.urlsafe_b64encode(hashed))
+    
     with sqlite3.connect(CLIENT_DB_PATH) as conn:
         cursor = conn.cursor()
         
@@ -27,7 +37,7 @@ def fetch_and_get_all_msgs(token):
             CREATE TABLE IF NOT EXISTS msgs (
                 sender TEXT NOT NULL,
                 user TEXT NOT NULL,
-                content TEXT NOT NULL,
+                content BLOB NOT NULL,
                 date TEXT
             );""")
 
@@ -36,7 +46,7 @@ def fetch_and_get_all_msgs(token):
                 cursor.execute("""
                     INSERT INTO msgs (user, sender, content, date) 
                     VALUES (?, ?, ?, ?)
-                """, (current_username, msg['sender'], msg['content'], msg['date']))
+                """, (current_username, msg['sender'], key.encrypt(msg['content'].encode()), msg['date']))
             conn.commit()
 
         cursor.execute("SELECT sender, content, date FROM msgs WHERE user=?", (current_username,))
@@ -46,7 +56,7 @@ def fetch_and_get_all_msgs(token):
         for row in rows:
             all_messages.append({
                 "sender": row[0],
-                "content": row[1],
+                "content": key.decrypt(row[1]).decode('utf-8'),
                 "date": row[2]
             })
         all_messages.sort(key=lambda x: x["date"])
@@ -143,7 +153,9 @@ def choose_server():
 def login_register_menu():
     token = None
     global current_username
+    global current_password
     global private_key
+    
     while not token:
         print("Choose an option:")
         print("\t1. Sign Up to a new account.")
@@ -182,6 +194,7 @@ def login_register_menu():
                     
     print(f"Logged in into {username}.")
     current_username = username
+    current_password = password
     return token
 
 def send_msg(token):
