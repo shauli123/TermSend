@@ -142,9 +142,13 @@ class MessageSelect(ctk.CTkScrollableFrame):
             widget.destroy()
                 
         for i, msg in enumerate(message_list):
+            len_of_showed_msg = 10
+            if not len(msg['content']) > 10:
+                len_of_showed_msg = len(msg['content'])
+            
             select_btn = ctk.CTkButton(master=self,
                                        command=lambda m=msg: self.on_select(m['thread_id']), 
-                                       text=f"{msg['sender']} | {msg['date']} | {msg['content'][:6]}...")
+                                       text=f"{msg['sender']} | {msg['date']} | {msg['content'][:len_of_showed_msg]}...")
             select_btn._text_label.configure(wraplength=300)
             select_btn.add_to_grid = True 
             select_btn.grid(row=i, column=0, sticky="ew", padx=5, pady=2)
