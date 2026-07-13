@@ -1,3 +1,5 @@
 PyJWT
 cryptography
 rich
+customtkinter
+ctk-markdown
