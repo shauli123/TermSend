@@ -4,6 +4,7 @@ import client_util
 import ipaddress
 import socket
 import threading
+import exceptions
 from ctk_markdown import CTkMarkdown
 
 JWT = None
@@ -147,7 +148,7 @@ class MessageSelect(ctk.CTkScrollableFrame):
                 len_of_showed_msg = len(msg['content'])
             
             select_btn = ctk.CTkButton(master=self,
-                                       command=lambda m=msg: self.on_select(m['thread_id']), 
+                                       command=lambda m=msg: self.on_select(m['thread_id'], m['sender']), 
                                        text=f"{msg['sender']} | {msg['date']} | {msg['content'][:len_of_showed_msg]}...")
             select_btn._text_label.configure(wraplength=300)
             select_btn.add_to_grid = True 
@@ -193,8 +194,9 @@ class ThreadView(ctk.CTkScrollableFrame):
             msg_frame.pack(fill="x", padx=10, pady=5, anchor="e" if is_me else "w")
 
             header_label = ctk.CTkLabel(
-            master=msg_frame, 
-            text=f"{msg['sender']} | {msg['date']}", 
+                master=msg_frame, 
+                text=f"{msg['sender']} | {msg['date']}",
+                font = ctk.CTkFont(weight="bold")
             )
             header_label.pack(anchor="w", padx=10, pady=(5, 2))
 
@@ -214,7 +216,61 @@ class ThreadView(ctk.CTkScrollableFrame):
                 x, y, width, height = bbox
                 actual_pixel_height = y + height + 10
                 body_text.configure(height=actual_pixel_height)
-                    
+
+class ReplyTextbox(ctk.CTkFrame):
+    def __init__(self, master, jwt_callback, refresh_msgs, **kwargs):
+        super().__init__(master, **kwargs)
+        self.current_thread = -1
+        self.current_receiver = ''
+        self.jwt_callback = jwt_callback
+        self.refresh_msgs = refresh_msgs
+        
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=0)
+        
+        self.msg_entry = ctk.CTkTextbox(master=self, state="disabled")
+        
+        self.send_btn = ctk.CTkButton(
+            master=self,
+            text="↗",
+            width=35,
+            height=35,
+            corner_radius=17,
+            command=self.send_msg,
+            state="disabled",
+            font = ctk.CTkFont(weight="bold")
+        )
+        self.msg_entry.grid(column=0, row=0, sticky="nsew", padx=(10, 5), pady=10)
+        self.send_btn.grid(column=1, row=0, sticky="e", padx=(5, 10), pady=10)          
+    def send_msg(self):
+        global JWT
+        try:
+            res = client_network.send_msg(JWT,
+                                    self.current_receiver,
+                                    self.msg_entry.get("0.0", "end"),
+                                    self.current_thread)
+            if self.current_receiver != client_util.current_username:
+                client_util.insert_msg_to_db(client_util.current_username, self.current_receiver, self.msg_entry.get(0), res['thread_id'])
+            self.refresh_msgs()
+            self.msg_entry.delete("0.0", "end")
+        except exceptions.TokenError:
+            self.jwt_callback()
+        except Exception as e:
+            self.msg_entry.delete("0.0", "end")
+            self.msg_entry.insert("0.0", f'Cannot send message, Error: {e}')
+            
+        
+    def set_thread(self, thread_id, receiver):
+        self.current_thread = thread_id
+        self.current_receiver = receiver
+        if thread_id >= 0:
+            self.send_btn.configure(state="normal")
+            self.msg_entry.configure(state="normal")
+        else:
+            self.send_btn.configure(state="disabled")
+            self.msg_entry.configure(state="disabled")            
+
 class MainScreen(ctk.CTkFrame):
     def __init__(self, master, jwt_callback, **kwargs):
         super().__init__(master, **kwargs)
@@ -234,8 +290,19 @@ class MainScreen(ctk.CTkFrame):
         self.msg_select = MessageSelect(self.inner_frame_msgs, on_select=self.on_select_msg)
         self.msg_select.grid(row=0, column=1, sticky="nsew")
         
-        self.thread_view = ThreadView(master=self.inner_frame_msgs)
+        self.inner_thread_frame_msgs = ctk.CTkFrame(master=self.inner_frame_msgs)
+        self.inner_thread_frame_msgs.grid(row=0, column=0, sticky="nsew")
+        self.inner_thread_frame_msgs.columnconfigure(0, weight=1)
+        self.inner_thread_frame_msgs.rowconfigure(0, weight=10)
+        self.inner_thread_frame_msgs.rowconfigure(1, weight=1)
+        
+        self.thread_view = ThreadView(master=self.inner_thread_frame_msgs)
         self.thread_view.grid(row=0, column=0, sticky="nsew")
+        
+        self.reply_textbox = ReplyTextbox(master=self.inner_thread_frame_msgs,
+                                          jwt_callback=self.jwt_callback,
+                                          refresh_msgs=self.refresh_message_list)
+        self.reply_textbox.grid(row=1, column=0, sticky="nsew")
 
     def refresh_message_list(self):
         fetch_thread = threading.Thread(target=self.fetch_msgs_wrapper)
@@ -253,9 +320,11 @@ class MainScreen(ctk.CTkFrame):
         
     def refresh_frames_with_msgs(self, message_list):
         self.msg_select.refresh_messages(message_list)
+        self.thread_view.load_thread(self.thread_view.current_thread, message_list)
     
-    def on_select_msg(self, thread_id):
+    def on_select_msg(self, thread_id, sender):
         self.thread_view.load_thread(thread_id, MESSAGE_LIST)
+        self.reply_textbox.set_thread(thread_id, sender)
         
 class App(ctk.CTk):
     def __init__(self):
