@@ -3,8 +3,12 @@ import client_network
 import client_util
 import ipaddress
 import socket
+import threading
+from ctk_markdown import CTkMarkdown
 
 JWT = None
+MESSAGE_LIST = []
+
 
 class ConnectScreen(ctk.CTkFrame):
     def __init__(self, master, on_connect, **kwargs):
@@ -122,13 +126,134 @@ class LoginScreen(ctk.CTkFrame):
             self.status_label.configure(text = f"Error: {e}", text_color='red') 
         else:
             self.status_label.configure(text = f"Logged in!", text_color='green')
+            client_util.current_username = username
+            client_util.current_password = password
             self.on_login()
 
+class MessageSelect(ctk.CTkScrollableFrame):
+    def __init__(self, master, on_select, **kwargs):
+        super().__init__(master, **kwargs)
+        self.on_select = on_select
+        self.columnconfigure(0, weight=1)
+        self.bind("<Configure>", self.on_frame_resize)
+        
+    def refresh_messages(self, message_list):
+        for widget in self.winfo_children():
+            widget.destroy()
                 
+        for i, msg in enumerate(message_list):
+            select_btn = ctk.CTkButton(master=self,
+                                       command=lambda m=msg: self.on_select(m['thread_id']), 
+                                       text=f"{msg['sender']} | {msg['date']} | {msg['content'][:6]}...")
+            select_btn._text_label.configure(wraplength=300)
+            select_btn.add_to_grid = True 
+            select_btn.grid(row=i, column=0, sticky="ew", padx=5, pady=2)
+    
+    def on_frame_resize(self, event):
+        self.update_buttons_wrap()
+
+    def update_buttons_wrap(self):
+        available_width = self.winfo_width() - 30
+        if available_width > 0:
+            for widget in self.winfo_children():
+                if isinstance(widget, ctk.CTkButton):
+                    widget._text_label.configure(wraplength=available_width)
+
+class ThreadView(ctk.CTkScrollableFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        self.current_thread = -1
+    
+    def load_thread(self, thread_id, message_list):
+        for widget in self.winfo_children():
+            widget.destroy()
+            
+        thread_list = [msg for msg in message_list if msg['thread_id'] == thread_id][::-1]
+        self.current_thread = thread_id
+        for _, msg in enumerate(thread_list):
+            is_me = msg["sender"] == client_util.current_username
+            if is_me:
+                bg_color = ("#d1e7dd", "#2b2b2b")
+                border_color = ("#0f5132", "#1f6aa5") 
+            else:
+                bg_color = ("#f8f9fa", "#242424")     
+                border_color = ("#dee2e6", "#3e3e3e")
+            
+            msg_frame = ctk.CTkFrame(
+                master=self, 
+                fg_color=bg_color, 
+                border_color=border_color, 
+                border_width=1,
+                corner_radius=8
+            )
+            msg_frame.pack(fill="x", padx=10, pady=5, anchor="e" if is_me else "w")
+
+            header_label = ctk.CTkLabel(
+            master=msg_frame, 
+            text=f"{msg['sender']} | {msg['date']}", 
+            )
+            header_label.pack(anchor="w", padx=10, pady=(5, 2))
+
+            body_text = CTkMarkdown(
+                        master=msg_frame, 
+                        markdown_text=msg['content'],
+                        width=400, 
+                        height=60, 
+                        fg_color="transparent", 
+                        activate_scrollbars=False
+                    )
+            
+            body_text.pack(fill="x", padx=10, pady=(0, 5))
+
+            
+class MainScreen(ctk.CTkFrame):
+    def __init__(self, master, jwt_callback, **kwargs):
+        super().__init__(master, **kwargs)
+        self.jwt_callback = jwt_callback
+        
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=0)
+        self.rowconfigure(1, weight=1)
+        
+        self.inner_frame_msgs = ctk.CTkFrame(master=self)
+        self.inner_frame_msgs.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+               
+        self.inner_frame_msgs.rowconfigure(0, weight=1)
+        self.inner_frame_msgs.columnconfigure(0, weight=8)
+        self.inner_frame_msgs.columnconfigure(1, weight=1)
+
+        self.msg_select = MessageSelect(self.inner_frame_msgs, on_select=self.on_select_msg)
+        self.msg_select.grid(row=0, column=1, sticky="nsew")
+        
+        self.thread_view = ThreadView(master=self.inner_frame_msgs)
+        self.thread_view.grid(row=0, column=0, sticky="nsew")
+
+    def refresh_message_list(self):
+        fetch_thread = threading.Thread(target=self.fetch_msgs_wrapper)
+        fetch_thread.start()
+        
+    def fetch_msgs_wrapper(self):
+        global MESSAGE_LIST
+        try:
+            MESSAGE_LIST = client_util.fetch_and_get_all_msgs(JWT)[::-1]
+        except:
+            self.jwt_callback()
+            return
+        
+        self.after(0, self.refresh_frames_with_msgs, MESSAGE_LIST)
+        
+    def refresh_frames_with_msgs(self, message_list):
+        self.msg_select.refresh_messages(message_list)
+    
+    def on_select_msg(self, thread_id):
+        print(thread_id)
+        self.thread_view.load_thread(thread_id, MESSAGE_LIST)
+        
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.geometry("600x500")
+        self.geometry("700x500")
+        self.title("TermSend GUI")
         
         # Connect stage
         self.rowconfigure(0, weight=1)
@@ -139,14 +264,22 @@ class App(ctk.CTk):
         # Login screen
         self.login_screen = LoginScreen(self, self.on_login)
         
+        # Main screen
+        self.main_screen = MainScreen(self, self.jwt_callback)
         
+    def jwt_callback(self):
+        self.main_screen.grid_forget()
+        self.login_screen.grid(row=0, column=0, sticky="nsew")  
         
     def on_connect_to_server(self):
         self.connect_screen.grid_forget()
         self.login_screen.grid(row=0, column=0, sticky="nsew")
 
     def on_login(self):
-        pass
+        self.login_screen.grid_forget()
+        self.main_screen.grid(row=0, column=0, sticky="nsew")
+        self.main_screen.refresh_message_list()
+
 
 if __name__ == '__main__':
     app = App()
