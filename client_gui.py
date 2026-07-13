@@ -198,14 +198,19 @@ class ThreadView(ctk.CTkScrollableFrame):
                         master=msg_frame, 
                         markdown_text=msg['content'],
                         width=400, 
-                        height=60, 
                         fg_color="transparent", 
                         activate_scrollbars=False
                     )
             
             body_text.pack(fill="x", padx=10, pady=(0, 5))
+            body_text.update_idletasks()
+            bbox = body_text._textbox.bbox("end-1c")
 
-            
+            if bbox:
+                x, y, width, height = bbox
+                actual_pixel_height = y + height + 10
+                body_text.configure(height=actual_pixel_height)
+                    
 class MainScreen(ctk.CTkFrame):
     def __init__(self, master, jwt_callback, **kwargs):
         super().__init__(master, **kwargs)
@@ -246,7 +251,6 @@ class MainScreen(ctk.CTkFrame):
         self.msg_select.refresh_messages(message_list)
     
     def on_select_msg(self, thread_id):
-        print(thread_id)
         self.thread_view.load_thread(thread_id, MESSAGE_LIST)
         
 class App(ctk.CTk):
