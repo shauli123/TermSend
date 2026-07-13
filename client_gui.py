@@ -280,6 +280,40 @@ class MainScreen(ctk.CTkFrame):
         self.rowconfigure(0, weight=0)
         self.rowconfigure(1, weight=1)
         
+        # TOP
+        self.up_frame = ctk.CTkFrame(master=self)
+        self.up_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(0, 10))
+                
+        self.up_frame.rowconfigure(0, weight=1)
+        self.up_frame.columnconfigure(0, weight=7)
+        self.up_frame.columnconfigure(1, weight=7)
+        self.up_frame.columnconfigure(2, weight=0)
+        self.up_frame.columnconfigure(3, weight=0)
+        
+        self.string_search = ctk.CTkEntry(master=self.up_frame, placeholder_text="Text to search.")
+        self.string_search.grid(row=0, column=0, sticky="ew", padx = (0, 10))
+        self.uname_search = ctk.CTkEntry(master=self.up_frame, placeholder_text="Username to search.")
+        self.uname_search.grid(row=0, column=1, sticky="ew", padx = (0, 10))
+        
+        self.search_btn = ctk.CTkButton(master=self.up_frame,
+                                           text='⌕',
+                                           font = ctk.CTkFont(weight="bold"),
+                                           width=35,
+                                           height=35,
+                                           corner_radius=17,
+                                           command=self.search)
+        self.refresh_btn = ctk.CTkButton(master=self.up_frame,
+                                           text='⟳',
+                                           font = ctk.CTkFont(weight="bold"),
+                                           command=self.refresh_message_list,
+                                           width=35,
+                                           height=35,
+                                           corner_radius=17)
+        self.search_btn.grid(row=0, column=2)
+        self.refresh_btn.grid(row=0, column=3)
+
+
+        # Bottom
         self.inner_frame_msgs = ctk.CTkFrame(master=self)
         self.inner_frame_msgs.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
                
@@ -287,9 +321,11 @@ class MainScreen(ctk.CTkFrame):
         self.inner_frame_msgs.columnconfigure(0, weight=8)
         self.inner_frame_msgs.columnconfigure(1, weight=1)
 
+        # Right side
         self.msg_select = MessageSelect(self.inner_frame_msgs, on_select=self.on_select_msg)
         self.msg_select.grid(row=0, column=1, sticky="nsew")
         
+        # Left side
         self.inner_thread_frame_msgs = ctk.CTkFrame(master=self.inner_frame_msgs)
         self.inner_thread_frame_msgs.grid(row=0, column=0, sticky="nsew")
         self.inner_thread_frame_msgs.columnconfigure(0, weight=1)
@@ -323,8 +359,16 @@ class MainScreen(ctk.CTkFrame):
         self.thread_view.load_thread(self.thread_view.current_thread, message_list)
     
     def on_select_msg(self, thread_id, sender):
+        global MESSAGE_LIST
         self.thread_view.load_thread(thread_id, MESSAGE_LIST)
         self.reply_textbox.set_thread(thread_id, sender)
+    
+    def search(self):
+        global MESSAGE_LIST
+        uname = self.uname_search.get()
+        text = self.string_search.get()
+        
+        self.refresh_frames_with_msgs([msg for msg in MESSAGE_LIST if (uname == '' or msg['sender'] == uname) and (text.lower() == '' or text in msg['content'])])
         
 class App(ctk.CTk):
     def __init__(self):
