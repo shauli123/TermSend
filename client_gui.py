@@ -369,6 +369,65 @@ class MainScreen(ctk.CTkFrame):
         text = self.string_search.get()
         
         self.refresh_frames_with_msgs([msg for msg in MESSAGE_LIST if (uname == '' or msg['sender'] == uname) and (text.lower() == '' or text in msg['content'])])
+    
+class SendMsgScreen(ctk.CTkFrame):
+    def __init__(self, master, jwt_callback, refresh_callback, **kwargs):
+        super().__init__(master, **kwargs)
+        self.jwt_callback = jwt_callback
+        self.refresh_callback = refresh_callback
+        
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=0)
+
+        self.username_frame = ctk.CTkFrame(master=self)
+        self.username_frame.grid(column=0, row=1, padx=40, pady=(30, 10), sticky='ew')
+
+        self.username_label = ctk.CTkLabel(master=self.username_frame, text='Recipient: ')
+        self.username_label.grid(column=0, row=0, padx=(15, 5), pady=15, sticky='w')
+        self.username_entry = ctk.CTkEntry(master=self.username_frame, placeholder_text='Username of recipient')
+        self.username_entry.grid(column=1, row=0, padx=(5, 15), pady=15, sticky='ew')
+        self.username_frame.grid_columnconfigure(1, weight=1)
+
+        self.msg_frame = ctk.CTkFrame(master=self, fg_color="transparent")
+        self.msg_frame.grid(column=0, row=2, padx=40, pady=10, sticky='nsew')
+        self.msg_frame.grid_columnconfigure(0, weight=1)
+        self.msg_frame.grid_rowconfigure(0, weight=1)
+
+        self.msg_entry = ctk.CTkTextbox(master=self.msg_frame)
+        self.msg_entry.grid(column=0, row=0, padx=(0, 15), sticky='nsew')
+
+        self.send_btn = ctk.CTkButton(
+            master=self.msg_frame,
+            text="↗",
+            width=45,
+            height=35,
+            corner_radius=22,
+            command=self.send_msg,
+            font=ctk.CTkFont(weight="bold", size=16)
+        )
+        self.send_btn.grid(column=1, row=0, sticky='s', pady=(0, 5))
+
+        self.status_label = ctk.CTkLabel(master=self, font=ctk.CTkFont(weight="bold"), text='')
+        self.status_label.grid(column=0, row=3, padx=40, pady=(10, 20), sticky='ew')
+    
+    def send_msg(self):
+        global JWT
+        receiver = self.username_entry.get()
+        try:
+            res = client_network.send_msg(JWT,
+                                    receiver,
+                                    self.msg_entry.get("0.0", "end"))
+            if receiver != client_util.current_username:
+                client_util.insert_msg_to_db(client_util.current_username, receiver, self.msg_entry.get("0.0", "end"), res['thread_id'])
+            self.status_label.configure(text = 'Message sent successfully', text_color='green')
+            self.refresh_callback()
+        except exceptions.TokenError:
+            self.jwt_callback()
+        except Exception as e:
+            self.status_label.configure(text = f'Error: {e}', text_color='red')
         
 class App(ctk.CTk):
     def __init__(self):
@@ -385,11 +444,24 @@ class App(ctk.CTk):
         # Login screen
         self.login_screen = LoginScreen(self, self.on_login)
         
+        # Setting up tabs
+        self.tabview = ctk.CTkTabview(master=self, anchor='ne', corner_radius=16)
+        
+        self.tabview.add("Main")
+        self.tabview.add("Send")
+        self.tabview.tab('Main').grid_rowconfigure(0, weight=1)
+        self.tabview.tab('Main').grid_columnconfigure(0, weight=1)
+        self.tabview.tab('Send').grid_rowconfigure(0, weight=1)
+        self.tabview.tab('Send').grid_columnconfigure(0, weight=1)
+        
         # Main screen
-        self.main_screen = MainScreen(self, self.jwt_callback)
+        self.main_screen = MainScreen(self.tabview.tab('Main'), self.jwt_callback)
+        self.send_screen = SendMsgScreen(self.tabview.tab('Send'), self.jwt_callback, self.main_screen.refresh_message_list)
         
     def jwt_callback(self):
         self.main_screen.grid_forget()
+        self.send_screen.grid_forget()
+        self.tabview.grid_forget()
         self.login_screen.grid(row=0, column=0, sticky="nsew")  
         
     def on_connect_to_server(self):
@@ -398,7 +470,9 @@ class App(ctk.CTk):
 
     def on_login(self):
         self.login_screen.grid_forget()
-        self.main_screen.grid(row=0, column=0, sticky="nsew")
+        self.tabview.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.main_screen.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.send_screen.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self.main_screen.refresh_message_list()
 
 
