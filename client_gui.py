@@ -434,7 +434,7 @@ class App(ctk.CTk):
         super().__init__()
         self.geometry("700x500")
         self.title("TermSend GUI")
-        
+        self.iconbitmap('icos\\gui.ico')
         # Connect stage
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
