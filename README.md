@@ -1,6 +1,6 @@
 # TermSend
 
-**TermSend** is a mail-like, tui based self-hosted messaging system that uses: sockets, encryption and sqllite.
+**TermSend** is a mail-like, tui & gui based self-hosted messaging system that uses: sockets, encryption and sqllite.
 
 TermSend is built in Python 3.11+
 
@@ -19,6 +19,7 @@ TermSend is built in Python 3.11+
     *   [Setting up the environment (Server & Python Client)](#setting-up-the-environment)
     *   [Setting up Server](#setting-up-server)
     *   [Running & using client](#running--using-client)
+    *   [Using GUI client](#using-gui-client)
 
 ## Features:
 
@@ -111,4 +112,21 @@ Enter your choice:
 ```
 for each option if it needs more data it will ask for it
 for example option 3 asks for a username
+
+### Using GUI Client
+so it is pretty easy and it has stages like the tui client
+#### Stage 1 - Server connection
+Enter your TermSend server ip & port and press connect!
+If you got an error do as prompted!
+
+#### Stage 2 - Login/Signup
+After you connected to the server you need to login/signup
+To login: Enter your username and password as normal and press login
+To signup: Enter your new username and password and press signup
+if you got an error do as prompted!
+
+#### Stage 3 - Using the system
+Now you will see that you are in the system and there is 2 tabs:
+* Main - the main tab is used to see & search msgs and threads and reply to them
+* Send - the send tab lets you send a new msg in a new thread!
 
